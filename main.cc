@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include "HttpServer.hpp"
+#include "Log.hpp"
 
 static void Usage(std::string proc)
 {

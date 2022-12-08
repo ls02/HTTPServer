@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <pthread.h>
+#include "Log.hpp"
 #include "TcpServer.hpp"
 #include "Protocol.hpp"
 
@@ -29,6 +30,7 @@ class HttpServer
 
     void Loop()
     {
+        LOG(INFO, "Loop begin");
         int listen_sock = _tcp_server->Sock();
         while (!_stop)
         {
@@ -39,6 +41,7 @@ class HttpServer
             {
                 continue;
             }
+            LOG(INFO, "Get a new link");
             int* _sock = new int(sock);
             pthread_t tid;
             pthread_create(&tid, nullptr, Entrance::HandlerRequest, _sock);

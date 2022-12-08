@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "Log.hpp"
 
 #define BACKLOG 5
 
@@ -51,6 +52,7 @@ class TcpServer
             Socket();
             Bind();
             Listen();
+            LOG(INFO, "tcp_server init ... success");
         }
 
         void Socket()
@@ -58,11 +60,13 @@ class TcpServer
             _listen_sock = socket(AF_INET, SOCK_STREAM, 0);
             if(_listen_sock < 0)
             {
+                LOG(FATAL, "socket error");
                 exit(1);
             }
 
             int opt = 1;
             setsockopt(_listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+            LOG(INFO, "create socket ... success");
         }
 
         void Bind()
@@ -75,16 +79,22 @@ class TcpServer
 
             if(bind(_listen_sock, (struct sockaddr*)&local, sizeof(local)) < 0)
             {
+                LOG(FATAL, "bind error!");
                 exit(2);
             }
+
+            LOG(INFO, "bind socket ... success!");
         }
 
         void Listen()
         {
             if (listen(_listen_sock, BACKLOG) < 0)
             {
+                LOG(FATAL, "listen socket error!");
                 exit(3);
             }
+
+            LOG(INFO, "listen socket ... success!");
         }
 
         int Sock()
@@ -93,7 +103,12 @@ class TcpServer
         }
 
         ~TcpServer()
-        {}
+        {
+            if (_listen_sock >= 0)
+            {
+                close(_listen_sock);
+            }
+        }
 };
 
 TcpServer* TcpServer::svr = nullptr;
