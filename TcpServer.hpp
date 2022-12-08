@@ -10,7 +10,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define PORT 8083
 #define BACKLOG 5
 
 class TcpServer 
@@ -21,7 +20,7 @@ class TcpServer
         static TcpServer* svr;
 
     private:
-        TcpServer(int port = PORT)
+        TcpServer(int port)
             :_port(port)
              ,_listen_sock(-1)
         {}
@@ -86,6 +85,11 @@ class TcpServer
             {
                 exit(3);
             }
+        }
+
+        int Sock()
+        {
+            return _listen_sock;
         }
 
         ~TcpServer()

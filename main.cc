@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
-#include "TcpServer.hpp"
+#include <memory>
+#include "HttpServer.hpp"
 
 static void Usage(std::string proc)
 {
@@ -17,10 +18,10 @@ int main(int argc, char* argv[])
    }
 
    int port = atoi(argv[1]);
-   TcpServer* svr = TcpServer::GetInstance(port);
 
-   for ( ; ;  )
-   {}
+   std::shared_ptr<HttpServer> http_server(new HttpServer(port)); 
+   http_server->InitServer();
+   http_server->Loop();
 
    return 0;
 }

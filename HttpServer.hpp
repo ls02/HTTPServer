@@ -1,6 +1,6 @@
-#pragma once
-//#ifndef __HTTP_SERVER_HPP__
-//#define __HTTP_SERVER_HPP__
+#pragma once 
+#ifndef __HTTP_SERVER_HPP__
+#define __HTTP_SERVER_HPP__
 
 #include <iostream>
 #include <pthread.h>
@@ -9,49 +9,46 @@
 
 #define PORT 8083
 
-class HttpServer
+class HttpServer 
 {
     private:
         int _port;
-        TcpServer* tcp_server;
+        TcpServer* _tcp_server;
         bool _stop;
     public:
-        HttpServer(int port = PORT)
-            :_port(port)
-             ,tcp_server(nullptr)
-             ,_stop(false)
-        {}
+    HttpServer(int port = PORT)
+        :_port(port)
+         ,_tcp_server(nullptr)
+         ,_stop(false)
+    {}
 
-        void InitServer()
-        {
-            tcp_server = TcpServer::GetInistance(_port);
-        }
+    void InitServer()
+    {
+        _tcp_server = TcpServer::GetInstance(_port);
+    }
 
-        void Loop()
+    void Loop()
+    {
+        int listen_sock = _tcp_server->Sock();
+        while (!_stop)
         {
-            int listen_sock = tcp_server->Sock();
-            while (!_stop)
+            struct sockaddr_in peer;
+            socklen_t len = sizeof(peer);
+            int sock = accept(listen_sock, (struct sockaddr*)&peer, &len);
+            if (sock < 0)
             {
-                struct sockaddr_in peer;
-                socklen_t len = sizeof(peer);
-                int sock = accept(listen_sock, (struct sockaddr*)&peer, &len);
-                if (sock < 0)
-                {
-                    continue;
-                }
-
-                int* _sock = new int(sock);
-                pthread_t tid;
-                pthread_create(&tid, nullptr, Entrance::HandlerRequest, _sock);
-                pthread_detach(tid);
+                continue;
             }
+            int* _sock = new int(sock);
+            pthread_t tid;
+            pthread_create(&tid, nullptr, Entrance::HandlerRequest, _sock);
+            pthread_detach(tid);
         }
+    }
 
-        ~HttpServer()
-        {
-
-        }
+    ~HttpServer()
+    {}
 
 };
 
-//#endif
+#endif
