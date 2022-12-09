@@ -30,6 +30,7 @@ class HttpServer
 
     void Loop()
     {
+        TcpServer* tsvr = TcpServer::GetInstance(_port);
         LOG(INFO, "Loop begin");
         int listen_sock = _tcp_server->Sock();
         while (!_stop)
