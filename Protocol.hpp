@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 #include <sstream>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -39,10 +40,13 @@ class HttpRequest
         std::string _path;
         std::string _query_string;
 
+        bool _cgi;
     public:
         HttpRequest()
             :_content_length(0)
+             ,_cgi(false)
         {}
+
         ~HttpRequest()
         {}
 };
@@ -111,9 +115,8 @@ class EndPoint
             std::stringstream ss(line);
             ss >> _http_request._method >> _http_request._uri >> _http_request._version;
 
-            LOG(INFO, _http_request._method);
-            LOG(INFO, _http_request._uri);
-            LOG(INFO, _http_request._version);
+            auto& method = _http_request._method;
+            std::transform(method.begin(), method.end(), method.begin(), ::toupper);
         }
 
         //分离报头的字段，用一个map存储起来
@@ -175,6 +178,11 @@ class EndPoint
             }
         }
 
+        int ProcessNonCgi()
+        {
+            return 0;
+        }
+
     public:
         EndPoint(int sock)
             :_sock(sock)
@@ -207,11 +215,21 @@ class EndPoint
                 if (pos != std::string::npos)
                 {
                     Util::CutString(_http_request._uri, _http_request._path, _http_request._query_string, "?");
+                    _http_request._cgi = true;
                 }
                 else 
                 {
                     _http_request._path = _http_request._uri;
                 }
+            }
+            else if(_http_request._method == "POST")
+            {
+                //POST
+                _http_request._cgi = true;
+            }
+            else 
+            {
+                //Do Nothing
             }
             path = _http_request._path;
             _http_request._path = WEB_ROOT;
@@ -236,6 +254,7 @@ class EndPoint
                if ((st.st_mode & S_IXUSR) || (st.st_mode & S_IXGRP) || (st.st_mode & S_IXOTH))
                {
                    //特殊处理
+                   _http_request._cgi = true;
                }
             }
             else 
@@ -246,6 +265,15 @@ class EndPoint
                 LOG(WARNING, info);
                     code = NOT_FOUND;
                 goto END;
+            }
+
+            if (_http_request._cgi)
+            {
+                //ProcessCgi();
+            }
+            else 
+            {
+                 ProcesNonCgi();//简单的网页返回，返回静态的网页
             }
 
 END:
