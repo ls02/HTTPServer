@@ -8,6 +8,8 @@
 #include <unordered_map>
 #include <algorithm>
 #include <sstream>
+#include <fcntl.h>
+#include <sys/sendfile.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -16,11 +18,30 @@
 #include "Log.hpp"
 
 #define SEP ": "
-
 #define OK 200
 #define NOT_FOUND 404
 #define WEB_ROOT "wwwroot"
 #define HOME_PAGE "index.html"
+#define HTTP_VERSION "HTTP/1.0"
+#define LINE_END "\r\n"
+
+static std::string Code2Desc(int code)
+{
+    std::string desc;
+    switch(code)
+    {
+        case 200:
+            desc =  "OK";
+            break;
+        case 404:
+            desc = "Not Found";
+            break;
+        default:
+            break;
+    }
+
+    return desc;
+}
 
 class HttpRequest 
 {
@@ -60,9 +81,13 @@ class HttpResponse
         std::string _response_body;
 
         int _status_code;
+        int _fd;
+        int _size;
     public:
         HttpResponse()
-            :_status_code(OK)
+            :_blank(LINE_END)
+            ,_status_code(OK)
+            ,_fd(-1)
         {}
         ~HttpResponse()
         {}
@@ -178,9 +203,24 @@ class EndPoint
             }
         }
 
-        int ProcessNonCgi()
+        int ProcessNonCgi(int size)
         {
-            return 0;
+            _http_response._fd = open(_http_request._path.c_str(), O_RDONLY);
+            if (_http_response._fd >= 0)
+            {
+                _http_response._status_line = HTTP_VERSION;
+                _http_response._status_line += " ";
+                _http_response._status_line += std::to_string(_http_response._status_code);
+                _http_response._status_line += " ";
+                _http_response._status_line += Code2Desc(_http_response._status_code);
+                _http_response._status_line += LINE_END;
+                _http_response._size = size;
+
+                return OK;
+            }
+
+
+            return 404;
         }
 
     public:
@@ -200,6 +240,8 @@ class EndPoint
         //解析请求
         void BuildHttpResponse()
         {
+            struct stat st;
+            int size = 0;
             std::string path;
             auto& code = _http_response._status_code;
             if (_http_request._method != "GET" && _http_request._method != "POST")
@@ -239,7 +281,6 @@ class EndPoint
                 _http_request._path += HOME_PAGE;
             }
 
-            struct stat st;
             if (stat(_http_request._path.c_str(), &st) == 0)
             {
                 //说明资源是存在的
@@ -249,6 +290,7 @@ class EndPoint
                    //虽然是也给目录，但是觉对不会以 '/' 结尾
                    _http_request._path += "/";
                    _http_request._path += HOME_PAGE;
+                   stat(_http_request._path.c_str(), &st);
                }
 
                if ((st.st_mode & S_IXUSR) || (st.st_mode & S_IXGRP) || (st.st_mode & S_IXOTH))
@@ -256,6 +298,7 @@ class EndPoint
                    //特殊处理
                    _http_request._cgi = true;
                }
+               size = st.st_size;
             }
             else 
             {
@@ -263,7 +306,7 @@ class EndPoint
                 std::string info = _http_request._path;
                 info += " Not Found!";
                 LOG(WARNING, info);
-                    code = NOT_FOUND;
+                code = NOT_FOUND;
                 goto END;
             }
 
@@ -273,16 +316,32 @@ class EndPoint
             }
             else 
             {
-                 ProcesNonCgi();//简单的网页返回，返回静态的网页
+                //1. 目标网页一定存在
+                //2. 返回并不是单单的放回网页，而是要构建 HTTP 响应
+                code = ProcessNonCgi(size);//简单的网页返回，返回静态的网页
+            }
+END:
+            if (code != OK)
+            {
+
             }
 
-END:
             return;
         }
 
         void SendHttpResponse()
         {
+            send(_sock, _http_response._status_line.c_str(), _http_response._status_line.size(), 0);
 
+            for (auto iter : _http_response._response_header)
+            {
+                send(_sock, iter.c_str(), iter.size(), 0);
+            }
+
+            send(_sock, _http_response._blank.c_str(), _http_response._blank.size(), 0);
+
+            sendfile(_sock, _http_response._fd, nullptr, _http_response._size);
+            close(_http_response._fd);
         }
 
         ~EndPoint()
