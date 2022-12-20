@@ -59,6 +59,7 @@ class HttpRequest
         std::unordered_map<std::string, std::string> _header_kv;
         int _content_length;
         std::string _path;
+        std::string _suffix;
         std::string _query_string;
 
         bool _cgi;
@@ -216,6 +217,9 @@ class EndPoint
                 _http_response._status_line += LINE_END;
                 _http_response._size = size;
 
+                std::string content_length_string = "Content-Length: ";
+                content_length_string += size;
+
                 return OK;
             }
 
@@ -242,6 +246,7 @@ class EndPoint
         {
             struct stat st;
             int size = 0;
+            std::size_t found = 0;
             std::string path;
             auto& code = _http_response._status_code;
             if (_http_request._method != "GET" && _http_request._method != "POST")
@@ -308,6 +313,16 @@ class EndPoint
                 LOG(WARNING, info);
                 code = NOT_FOUND;
                 goto END;
+            }
+
+            found = _http_request._path.rfind(".");
+            if (found == std::string::npos)
+            {
+                _http_request._suffix = ".html";
+            }
+            else 
+            {
+                _http_request._suffix = _http_request._path.substr(found);
             }
 
             if (_http_request._cgi)
