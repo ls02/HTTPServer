@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <sys/sendfile.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -42,6 +43,26 @@ static std::string Code2Desc(int code)
 
     return desc;
 }
+
+static std::string Suffix2Desc(const std::string& suffix)
+{
+    static std::unordered_map<std::string, std::string> suffix2desc = {
+        {".html", "text/html"},
+        {".css", "text/css"},
+        {".js", "application/javascript"},
+        {".jpg", "application/x-jpg"},
+        {".xml", "application/xml"},
+    };
+
+    auto iter = suffix2desc.find(suffix);
+    if (iter != suffix2desc.end())
+    {
+        return iter->second;
+    }
+
+    return "text/html";
+}
+
 
 class HttpRequest 
 {
@@ -217,14 +238,63 @@ class EndPoint
                 _http_response._status_line += LINE_END;
                 _http_response._size = size;
 
-                std::string content_length_string = "Content-Length: ";
-                content_length_string += size;
+                std::string header_line = "Content-Length: ";
+                header_line += std::to_string(size);
+                header_line += LINE_END;
+                _http_response._response_header.push_back(header_line);
+
+                header_line = "Content-Type: ";
+                header_line += Suffix2Desc(_http_request._suffix);
+                _http_response._response_header.push_back(header_line);
 
                 return OK;
             }
 
 
             return 404;
+        }
+
+        int ProcessCgi()
+        {
+            int code = OK;
+            auto& bin = _http_request._path;
+
+            int input[2];
+            int output[2];
+
+            if (pipe(input) < 0)
+            {
+                LOG(ERROR, "pipe input error");
+                code = 404;
+            }
+
+            if (pipe(output) < 0)
+            {
+                LOG(ERROR, "pipe output error");
+                code = 404;
+            }
+
+            pid_t pid = fork();
+            if (pid == 0)
+            {
+                close(input[0]);
+                close(output[1]);
+            }
+            else if (pid < 0)
+            {
+                //error
+                LOG(ERROR, "fork error!");
+                return 404;
+            }
+            else 
+            {
+                //parent
+                close(input[1]);
+                close(output[0]);
+                waitpid(pid, nullptr, 0);
+            }
+
+            return code;
         }
 
     public:
@@ -328,6 +398,7 @@ class EndPoint
             if (_http_request._cgi)
             {
                 //ProcessCgi();
+                code = ProcessCgi();
             }
             else 
             {
