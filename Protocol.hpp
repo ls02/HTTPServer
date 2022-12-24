@@ -151,7 +151,7 @@ class EndPoint
 
                 line.resize(line.size() - 1);
                 _http_request._request_header.push_back(line);
-                LOG(INFO, line);
+                //LOG(INFO, line);
             }
         }
 
@@ -190,6 +190,7 @@ class EndPoint
                 auto iter = header_kv.find("Content-Length");
                 if (iter != header_kv.end())
                 {
+                    LOG(INFO, "Post Method, Content-Length" + iter->second);
                     _http_request._content_length = atoi(iter->second.c_str());
 
                     return true;
@@ -222,6 +223,7 @@ class EndPoint
                         break;
                     }
                 }
+                LOG(INFO, body);
             }
         }
 
@@ -256,8 +258,14 @@ class EndPoint
 
         int ProcessCgi()
         {
-            int code = OK;
+            //父进程数据
+            auto& method = _http_request._method;
+            auto& query_string = _http_request._query_string;//GET
+            auto& body_text = _http_request._request_body;//POST
             auto& bin = _http_request._path;
+
+            std::string query_string_env;
+            std::string method_env;
 
             int input[2];
             int output[2];
@@ -265,13 +273,11 @@ class EndPoint
             if (pipe(input) < 0)
             {
                 LOG(ERROR, "pipe input error");
-                code = 404;
             }
 
             if (pipe(output) < 0)
             {
                 LOG(ERROR, "pipe output error");
-                code = 404;
             }
 
             pid_t pid = fork();
@@ -279,6 +285,26 @@ class EndPoint
             {
                 close(input[0]);
                 close(output[1]);
+
+
+                method_env = "METHOD=";
+                method_env += method;
+
+                putenv((char*)method_env.c_str());
+
+                if (method == "GET")
+                {
+                    query_string_env = "QUERY_STRING=";
+                    query_string_env += query_string;
+                    putenv((char*)query_string_env.c_str());
+                    LOG(WARNING, "Get METHOD Query_String Env");
+                }
+
+                dup2(output[0], 0);
+                dup2(input[1], 1);
+                
+                execl(bin.c_str(), bin.c_str(), nullptr);
+                exit(1);
             }
             else if (pid < 0)
             {
@@ -291,10 +317,25 @@ class EndPoint
                 //parent
                 close(input[1]);
                 close(output[0]);
+
+                if (method == "POST")
+                {
+                    const char* start = body_text.c_str();
+                    int total = 0;
+                    int size = 0;
+                    while ((size = write(output[1], start + total, body_text.size() - total)))
+                    {
+                            total += size;
+                    }
+                }
+
                 waitpid(pid, nullptr, 0);
+
+                close(input[0]);
+                close(output[1]);
             }
 
-            return code;
+            return OK;
         }
 
     public:
