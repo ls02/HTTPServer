@@ -14,7 +14,6 @@ bool GetQueryString(std::string &query_string)
         result = true;
     }
     else if(method == "POST"){
-        //CGI如何得知需要从标准输入读取多少个字节呢？？
         int content_length = atoi(getenv("CONTENT_LENGTH"));
         char c = 0;
         while(content_length){

@@ -26,8 +26,6 @@ int main()
     //from http
     if(GetQueryString(query_string)){
         std::cerr << query_string << std::endl;
-        //数据处理？
-        //name=tom&passwd=111111
 
         std::string name;
         std::string passwd;

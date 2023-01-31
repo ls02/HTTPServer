@@ -60,7 +60,7 @@ class TcpServer{
             memset(&local, 0, sizeof(local));
             local.sin_family = AF_INET;
             local.sin_port = htons(port);
-            local.sin_addr.s_addr = INADDR_ANY; //云服务器不能直接绑定公网IP
+            local.sin_addr.s_addr = INADDR_ANY;
 
             if(bind(listen_sock, (struct sockaddr*)&local, sizeof(local)) < 0){
                 LOG(FATAL, "bind error!");
