@@ -1,58 +1,43 @@
-#pragma once 
-#ifndef __HTTP_SERVER_HPP__
-#define __HTTP_SERVER_HPP__
+#pragma once
 
 #include <iostream>
 #include <pthread.h>
+#include <signal.h>
 #include "Log.hpp"
 #include "TcpServer.hpp"
-#include "Protocol.hpp"
+#include "Task.hpp"
+#include "ThreadPool.hpp"
 
-#define PORT 8083
+#define PORT 8081
 
-class HttpServer 
-{
+class HttpServer{
     private:
-        int _port;
-        TcpServer* _tcp_server;
-        bool _stop;
+        int port;
+        bool stop;
     public:
-    HttpServer(int port = PORT)
-        :_port(port)
-         ,_tcp_server(nullptr)
-         ,_stop(false)
-    {}
-
-    void InitServer()
-    {
-        _tcp_server = TcpServer::GetInstance(_port);
-    }
-
-    void Loop()
-    {
-        TcpServer* tsvr = TcpServer::GetInstance(_port);
-        LOG(INFO, "Loop begin");
-        int listen_sock = _tcp_server->Sock();
-        while (!_stop)
+        HttpServer(int _port = PORT): port(_port),stop(false)
+        {}
+        void InitServer()
         {
-            struct sockaddr_in peer;
-            socklen_t len = sizeof(peer);
-            int sock = accept(listen_sock, (struct sockaddr*)&peer, &len);
-            if (sock < 0)
-            {
-                continue;
-            }
-            LOG(INFO, "Get a new link");
-            int* _sock = new int(sock);
-            pthread_t tid;
-            pthread_create(&tid, nullptr, Entrance::HandlerRequest, _sock);
-            pthread_detach(tid);
+            //信号SIGPIPE需要进行忽略，如果不忽略，在写入时候，可能直接崩溃server
+            signal(SIGPIPE, SIG_IGN); 
         }
-    }
-
-    ~HttpServer()
-    {}
-
+        void Loop()
+        {
+            TcpServer *tsvr = TcpServer::getinstance(port);
+            LOG(INFO, "Loop begin");
+            while(!stop){
+                struct sockaddr_in peer;
+                socklen_t len = sizeof(peer);
+                int sock = accept(tsvr->Sock(), (struct sockaddr*)&peer, &len);
+                if(sock < 0){
+                    continue;
+                }
+                LOG(INFO, "Get a new link");
+                Task task(sock);
+                ThreadPool::getinstance()->PushTask(task);
+            }
+        }
+        ~HttpServer()
+        {}
 };
-
-#endif

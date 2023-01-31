@@ -2,27 +2,24 @@
 #include <string>
 #include <memory>
 #include "HttpServer.hpp"
-#include "Log.hpp"
 
 static void Usage(std::string proc)
 {
-    std::cout << "Usage:\n\t" << proc << " port" << std::endl;
+    std::cout << "Usage:\n\t" << proc << " port" << std::endl;;
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-   if (argc != 2)
-   {
-       Usage(argv[0]);
+    if( argc != 2 ){
+        Usage(argv[0]);
+        exit(4);
+    }
+    int port = atoi(argv[1]);
 
-       exit(4);
-   }
+    std::shared_ptr<HttpServer> http_server(new HttpServer(port));
 
-   int port = atoi(argv[1]);
+    http_server->InitServer();
+    http_server->Loop();
 
-   std::shared_ptr<HttpServer> http_server(new HttpServer(port)); 
-   http_server->InitServer();
-   http_server->Loop();
-
-   return 0;
+    return 0;
 }
